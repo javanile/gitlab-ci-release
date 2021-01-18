@@ -143,15 +143,18 @@ ci_curl_error() {
 # curl -fsSL ...
 ##
 dist_upload_action() {
-#    echo curl --request POST \
-#         --form "branch=master" \
-#         --form "commit_message=New report" \
-#         --form "start_branch=master" \
-#         --form "actions[][action]=$1" \
-#         --form "actions[][file_path]=${CI_PROJECT_PATH:-ci}/${tag:-latest}/$(basename "$2")" \
-#         --form "actions[][content]=<$2" \
-#         --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
-#         -fsSL "${GITLAB_PROJECTS_API_URL}/${GITLAB_RELEASES_STORE//\//%2F}/repository/commits"
+    local file_path=${CI_PROJECT_PATH:-ci}/${tag:-latest}
+    [[ -n "$3" ]] && file_path="${file_path=}/$3"
+    file_path="${file_path}/$(basename "$2")"
+    curl --request POST \
+         --form "branch=master" \
+         --form "commit_message=New report" \
+         --form "start_branch=master" \
+         --form "actions[][action]=$1" \
+         --form "actions[][file_path]=${file_path}" \
+         --form "actions[][content]=<$2" \
+         --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
+         -fsSL "${GITLAB_PROJECTS_API_URL}/${GITLAB_RELEASES_STORE//\//%2F}/repository/commits"
 
     [[ $? = "0" ]] && echo "";
 }
@@ -160,14 +163,13 @@ dist_upload_action() {
 #
 ##
 dist_upload_file() {
-    dist_upload_action update "$1" || dist_upload_action create "$1"
+    dist_upload_action update "$1" "$2" || dist_upload_action create "$1" "$2"
 }
 
 ##
 #
 ##
 dist_upload_dir() {
-  echo "-- $1 $2"
   for path in $1/*; do
     prefix=$(basename "$1")
     [[ -n "$2" ]] && prefix="$2/${prefix}"
@@ -176,7 +178,7 @@ dist_upload_dir() {
       dist_upload_dir "${path}" "${prefix}"
     elif [[ -f "${path}" ]]; then
       echo " - File '${path}' => ${prefix}"
-      dist_upload_file "${path}"
+      dist_upload_file "${path}" "${prefix}"
     else
       echo " - Ignored '${path}'"
     fi
