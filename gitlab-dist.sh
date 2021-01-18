@@ -32,7 +32,7 @@ CI_CURRENT_PROJECT_SLUG="${CI_PROJECT_PATH//\//%2F}"
 CI_CURRENT_BRANCH="${CI_COMMIT_BRANCH}"
 
 usage () {
-    echo "Usage: ./gitlab-ci-helper.sh [OPTION]... [COMMAND] [ARGUMENT]..."
+    echo "Usage: ./gitlab-dist.sh [OPTION]... [FILE]..."
     echo ""
     echo "Support your CI workflow with useful macro."
     echo ""
@@ -42,19 +42,21 @@ usage () {
     echo "  info                          Create new file with NAME and CONTENT into BRANCH"
     echo ""
     echo "List of available options"
-    echo "  -b, --branch BRANCH      Set current branch"
-    echo "  -h, --help               Display this help and exit"
-    echo "  -v, --version            Display current version"
+    echo "  -t, --tag TAG          Set release tag name"
+    echo "  -h, --help             Display this help and exit"
+    echo "  -v, --version          Display current version"
     echo ""
     echo "Documentation can be found at https://github.com/javanile/lcov.sh"
 }
 
+tag=latest
 options=$(getopt -n gitlab-ci-helper.sh -o vh -l version,help -- "$@")
 
 eval set -- "${options}"
 
 while true; do
     case "$1" in
+        -t|--tag) shift; tag=$1 ;;
         -v|--version) echo "GitLab CI Helper [0.0.1] - by Francesco Bianco <bianco@javanile.org>"; exit ;;
         -h|--help) usage; exit ;;
         --) shift; break ;;
@@ -136,6 +138,42 @@ ci_curl_error() {
     rm CI_CURL_ERROR
     exit 1
 }
+
+
+## curl -fsSL ...
+dist_upload_file() {
+    curl --request POST \
+         --form "branch=master" \
+         --form "commit_message=New report" \
+         --form "start_branch=master" \
+         --form "actions[][action]=$1" \
+         --form "actions[][file_path]=${CI_PROJECT_PATH:-ci}/${tag:-latest}/$(basename "$2")" \
+         --form "actions[][content]=<$2" \
+         --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
+         -fsSL "${GITLAB_PROJECT_API_URL}/${GITLAB_RELEASES_STORE//\//%2F}/repository/commits"
+}
+
+## curl -fsSL ...
+dist_upload_dir() {
+    for path in $1/*; do
+      if [[ -d "${path}" ]]; then
+        echo " - Directory '${path}'"
+        dist_upload_dir "${path}"
+      elif [[ -f "${path}" ]]; then
+        echo " - File '${path}'"
+        #dist_upload_file "${path}"
+      else
+        echo " - Ignored '${path}'"
+      fi
+    done
+}
+
+##
+##
+upload_report() {
+    dist_upload_action update "$1" || dist_upload_action create "$1"
+}
+
 
 ##
 # Create a new branch if not exists based on current branch.
@@ -225,35 +263,18 @@ ci_info() {
 # Main function
 ##
 main () {
-    [[ -z "$1" ]] && error "Missing command"
-    [[ -z "${CI_PROJECT_PATH}" ]] && error "Missing or empty CI_PROJECT_PATH variable."
-    [[ -z "${GITLAB_PRIVATE_TOKEN}" ]] && error "Missing or empty GITLAB_PRIVATE_TOKEN variable."
-
-    case "$1" in
-        create:branch)
-            ci_create_branch "$2" "$3"
-            ;;
-        create:file)
-            ci_create_file "$2" "$3"
-            ;;
-        create:merge-request|create:mr)
-            ci_create_merge_request "$2" "$3"
-            ;;
-        accept:merge-request|accept:mr)
-            ci_accept_merge_request "$2"
-            ;;
-        fail)
-            ci_fail
-            ;;
-        info)
-            ci_info
-            ;;
-        *)
-            error "Unknown command: $1"
-            ;;
-    esac
-
-    echo ""
+  echo "Tag '${tag}'"
+  for path in "$@"; do
+    if [[ -d "${path}" ]]; then
+      echo " - Directory '${path}'"
+      dist_upload_dir "${path}"
+    elif [[ -f "${path}" ]]; then
+      echo " - File '${path}'"
+      #dist_upload_file "${path}"
+    else
+      echo " - Ignored '${path}'"
+    fi
+  done
 }
 
 ## Entrypoint
