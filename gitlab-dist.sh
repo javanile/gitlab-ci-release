@@ -139,41 +139,49 @@ ci_curl_error() {
     exit 1
 }
 
+##
+# curl -fsSL ...
+##
+dist_upload_action() {
+#    echo curl --request POST \
+#         --form "branch=master" \
+#         --form "commit_message=New report" \
+#         --form "start_branch=master" \
+#         --form "actions[][action]=$1" \
+#         --form "actions[][file_path]=${CI_PROJECT_PATH:-ci}/${tag:-latest}/$(basename "$2")" \
+#         --form "actions[][content]=<$2" \
+#         --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
+#         -fsSL "${GITLAB_PROJECTS_API_URL}/${GITLAB_RELEASES_STORE//\//%2F}/repository/commits"
 
-## curl -fsSL ...
+    [[ $? = "0" ]] && echo "";
+}
+
+##
+#
+##
 dist_upload_file() {
-    curl --request POST \
-         --form "branch=master" \
-         --form "commit_message=New report" \
-         --form "start_branch=master" \
-         --form "actions[][action]=$1" \
-         --form "actions[][file_path]=${CI_PROJECT_PATH:-ci}/${tag:-latest}/$(basename "$2")" \
-         --form "actions[][content]=<$2" \
-         --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
-         -fsSL "${GITLAB_PROJECT_API_URL}/${GITLAB_RELEASES_STORE//\//%2F}/repository/commits"
-}
-
-## curl -fsSL ...
-dist_upload_dir() {
-    for path in $1/*; do
-      if [[ -d "${path}" ]]; then
-        echo " - Directory '${path}'"
-        dist_upload_dir "${path}"
-      elif [[ -f "${path}" ]]; then
-        echo " - File '${path}'"
-        #dist_upload_file "${path}"
-      else
-        echo " - Ignored '${path}'"
-      fi
-    done
-}
-
-##
-##
-upload_report() {
     dist_upload_action update "$1" || dist_upload_action create "$1"
 }
 
+##
+#
+##
+dist_upload_dir() {
+  echo "-- $1 $2"
+  for path in $1/*; do
+    prefix=$(basename "$1")
+    [[ -n "$2" ]] && prefix="$2/${prefix}"
+    if [[ -d "${path}" ]]; then
+      echo " - Directory '${path}'"
+      dist_upload_dir "${path}" "${prefix}"
+    elif [[ -f "${path}" ]]; then
+      echo " - File '${path}' => ${prefix}"
+      dist_upload_file "${path}"
+    else
+      echo " - Ignored '${path}'"
+    fi
+  done
+}
 
 ##
 # Create a new branch if not exists based on current branch.
@@ -263,6 +271,10 @@ ci_info() {
 # Main function
 ##
 main () {
+  [[ -z "${CI_PROJECT_PATH}" ]] && error "Missing or empty CI_PROJECT_PATH variable."
+  [[ -z "${GITLAB_RELEASES_STORE}" ]] && error "Missing or empty GITLAB_RELEASES_STORE variable."
+  [[ -z "${GITLAB_PRIVATE_TOKEN}" ]] && error "Missing or empty GITLAB_PRIVATE_TOKEN variable."
+
   echo "Tag '${tag}'"
   for path in "$@"; do
     if [[ -d "${path}" ]]; then
@@ -270,7 +282,7 @@ main () {
       dist_upload_dir "${path}"
     elif [[ -f "${path}" ]]; then
       echo " - File '${path}'"
-      #dist_upload_file "${path}"
+      dist_upload_file "${path}"
     else
       echo " - Ignored '${path}'"
     fi
