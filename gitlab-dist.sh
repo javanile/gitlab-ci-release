@@ -147,7 +147,7 @@ dist_upload_action() {
     [[ -n "$3" ]] && file_path="${file_path=}/$3"
     file_path="${file_path}/$(basename "$2")"
 
-    echo "Release storage: ${url}"
+    #echo "Release storage: ${url}"
     echo " - Reading '$2'"
     [[ -f "$2" ]] || echo "File not found: $2"
     echo -n " - Uploading '${file_path}' ($1) "
@@ -157,7 +157,8 @@ dist_upload_action() {
          --form "start_branch=master" \
          --form "actions[][action]=$1" \
          --form "actions[][file_path]=${file_path}" \
-         --form "actions[][content]=<$2" \
+         --form "actions[][content]=$(cat $2 | base64)" \
+         --form "actions[][encoding]=base64" \
          --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
          -fsSL "${url}" > /dev/null && echo "(done)"
 
