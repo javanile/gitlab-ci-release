@@ -34,15 +34,11 @@ CI_CURRENT_BRANCH="${CI_COMMIT_BRANCH}"
 usage () {
     echo "Usage: ./gitlab-dist.sh [OPTION]... [FILE]..."
     echo ""
-    echo "Support your CI workflow with useful macro."
-    echo ""
-    echo "List of available commands"
-    echo "  create:branch NAME REF        Create new branch with NAME from REF"
-    echo "  create:file NAME CONTENT      Create new file with NAME and CONTENT into BRANCH"
-    echo "  info                          Create new file with NAME and CONTENT into BRANCH"
+    echo "Store files to GitLab repository to perform a releases storage."
     echo ""
     echo "List of available options"
     echo "  -t, --tag TAG          Set release tag name"
+    echo "  -l, --layout LAYOUT    Set release tag name"
     echo "  -h, --help             Display this help and exit"
     echo "  -v, --version          Display current version"
     echo ""
@@ -50,14 +46,16 @@ usage () {
 }
 
 tag=latest
-options=$(getopt -n gitlab-ci-helper.sh -o vh -l version,help -- "$@")
+layout=default-release-storage
+options=$(getopt -n gitlab-dist.sh -o l:t:vh -l layout:,tag:,version,help -- "$@")
 
 eval set -- "${options}"
 
 while true; do
     case "$1" in
-        -t|--tag) shift; tag=$1 ;;
-        -v|--version) echo "GitLab CI Helper [0.0.1] - by Francesco Bianco <bianco@javanile.org>"; exit ;;
+        -t|--tag) shift; tag=$1; ;;
+        -l|--layout) shift; layout=$1 ;;
+        -v|--version) echo "GitLab Dist [0.0.1] - by Francesco Bianco <bianco@javanile.org>"; exit ;;
         -h|--help) usage; exit ;;
         --) shift; break ;;
     esac
@@ -144,8 +142,12 @@ ci_curl_error() {
 ##
 dist_upload_action() {
     local file_path=${CI_PROJECT_PATH:-ci}/${tag:-latest}
+    #echo "ARGS ${@} - ${tag} - ${file_path}"
+    local url=${GITLAB_PROJECTS_API_URL}/${GITLAB_RELEASES_STORE//\//%2F}/repository/commits
     [[ -n "$3" ]] && file_path="${file_path=}/$3"
     file_path="${file_path}/$(basename "$2")"
+
+    echo -n " - Uploading '${file_path}' ($1) "
     curl --request POST \
          --form "branch=master" \
          --form "commit_message=New report" \
@@ -154,9 +156,9 @@ dist_upload_action() {
          --form "actions[][file_path]=${file_path}" \
          --form "actions[][content]=<$2" \
          --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
-         -fsSL "${GITLAB_PROJECTS_API_URL}/${GITLAB_RELEASES_STORE//\//%2F}/repository/commits"
+         -fsSL "${url}" > /dev/null && echo "(done)"
 
-    [[ $? = "0" ]] && echo "";
+    #[[ $? = "0" ]] && echo "";
 }
 
 ##
@@ -212,42 +214,6 @@ ci_create_file () {
         \"content\": \"$2\",
         \"commit_message\": \"Create file $1\"
     }"
-}
-
-##
-# Create a new file if not exists on current branch.
-#
-# Ref: https://docs.gitlab.com/ee/api/branches.html#create-repository-branch
-##
-ci_create_merge_request () {
-    [[ -z "$1" ]] && error "Missing target branch"
-    [[ -z "$2" ]] && error "Missing merge request title"
-
-    ci_curl_post "merge_requests" "{
-        \"source_branch\": \"${CI_CURRENT_BRANCH}\",
-        \"target_branch\": \"$1\",
-        \"title\": \"$2\"
-    }"
-}
-
-##
-# Accept merge request.
-#
-# Ref: https://docs.gitlab.com/ee/api/branches.html#create-repository-branch
-##
-ci_accept_merge_request () {
-    [[ -z "$1" ]] && error "Missing target branch"
-
-    local merge_request=$(ci_curl_get "merge_requests?state=opened&source_branch=${CI_CURRENT_BRANCH}&target_branch=$1")
-    local iid=$(echo ${merge_request} | sed -n 's|.*"iid":\([^",]*\).*|\1|p')
-
-    [[ -z "${iid}" ]] && error "Merge request not found from '${CI_CURRENT_BRANCH}' to '$1' branch"
-
-    echo "Merge Request !${iid}"
-
-    ci_curl_put "merge_requests/${iid}/merge"
-
-    [[ "${CI_CURL_HTTP_STATUS}" = "406" ]] && error "Accepting merge request fails, please perform manual operation."
 }
 
 ##

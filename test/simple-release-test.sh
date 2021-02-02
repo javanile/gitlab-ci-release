@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -e -o allexport
 
-source ./.env
+source ./test/bootstrap.sh $0
 
-echo "CI_PROJECT_PATH=${CI_PROJECT_PATH}"
-echo "GITLAB_PRIVATE_TOKEN=${GITLAB_PRIVATE_TOKEN}"
-
-bash ./gitlab-dist.sh test/fixtures/demo1.txt test/fixtures/demo
+bash ./gitlab-dist.sh --tag demo2 test/fixtures/demo1.txt test/fixtures/demo
