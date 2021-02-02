@@ -146,6 +146,7 @@ dist_upload_action() {
     local url=${GITLAB_PROJECTS_API_URL}/${GITLAB_RELEASES_STORE//\//%2F}/repository/commits
     [[ -n "$3" ]] && file_path="${file_path=}/$3"
     file_path="${file_path}/$(basename "$2")"
+    base64 $2 > $2.base64
 
     #echo "Release storage: ${url}"
     echo " - Reading '$2'"
@@ -157,10 +158,12 @@ dist_upload_action() {
          --form "start_branch=master" \
          --form "actions[][action]=$1" \
          --form "actions[][file_path]=${file_path}" \
-         --form "actions[][content]=$(cat $2 | base64)" \
+         --form "actions[][content]=<$2.base64" \
          --form "actions[][encoding]=base64" \
          --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
          -fsSL "${url}" > /dev/null && echo "(done)"
+
+    rm $2.base64
 
     #[[ $? = "0" ]] && echo "";
 }
