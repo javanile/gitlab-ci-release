@@ -148,6 +148,8 @@ dist_upload_action() {
     file_path="${file_path}/$(basename "$2")"
 
     echo "Release storage: ${url}"
+    echo " - Reading '$2'"
+    [[ -f "$2" ]] || echo "File not found: $2"
     echo -n " - Uploading '${file_path}' ($1) "
     curl --request POST \
          --form "branch=master" \
