@@ -147,10 +147,11 @@ dist_upload_action() {
     [[ -n "$3" ]] && file_path="${file_path=}/$3"
     file_path="${file_path}/$(basename "$2")"
 
+    echo "Release storage: ${url}"
     echo -n " - Uploading '${file_path}' ($1) "
     curl --request POST \
          --form "branch=master" \
-         --form "commit_message=New report" \
+         --form "commit_message=fileupload" \
          --form "start_branch=master" \
          --form "actions[][action]=$1" \
          --form "actions[][file_path]=${file_path}" \
