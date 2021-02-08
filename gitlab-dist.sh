@@ -49,7 +49,7 @@ usage () {
 tag=latest
 branch=main
 layout=default-release-storage
-options=$(getopt -n gitlab-dist.sh -o l:t:vh -l layout:,tag:,version,help -- "$@")
+options=$(getopt -n gitlab-dist.sh -o l:t:b:vh -l layout:,tag:,branch:,version,help -- "$@")
 
 eval set -- "${options}"
 
