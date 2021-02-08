@@ -38,6 +38,7 @@ usage () {
     echo ""
     echo "List of available options"
     echo "  -t, --tag TAG          Set release tag name"
+    echo "  -b, --branch BRANCH    Set branch for releases store"
     echo "  -l, --layout LAYOUT    Set release tag name"
     echo "  -h, --help             Display this help and exit"
     echo "  -v, --version          Display current version"
@@ -46,6 +47,7 @@ usage () {
 }
 
 tag=latest
+branch=main
 layout=default-release-storage
 options=$(getopt -n gitlab-dist.sh -o l:t:vh -l layout:,tag:,version,help -- "$@")
 
@@ -54,6 +56,7 @@ eval set -- "${options}"
 while true; do
     case "$1" in
         -t|--tag) shift; tag=$1; ;;
+        -b|--branch) shift; branch=$1; ;;
         -l|--layout) shift; layout=$1 ;;
         -v|--version) echo "GitLab Dist [0.0.1] - by Francesco Bianco <bianco@javanile.org>"; exit ;;
         -h|--help) usage; exit ;;
@@ -154,9 +157,9 @@ dist_upload_action() {
     [[ -f "$2" ]] || echo "File not found: $2"
     echo -n " - Uploading '${file_path}' ($1) "
     curl --request POST \
-         --form "branch=master" \
+         --form "branch=${branch}" \
          --form "commit_message=fileupload" \
-         --form "start_branch=master" \
+         --form "start_branch=${branch}" \
          --form "actions[][action]=$1" \
          --form "actions[][file_path]=${file_path}" \
          --form "actions[][content]=<${file_base64}" \
